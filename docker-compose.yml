@@ -1,0 +1,63 @@
+name: bus-booking
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-busbooking}
+      BUSAPP_PASSWORD: ${BUSAPP_PASSWORD:?set BUSAPP_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql:/sql:ro
+      - ./ops/db/init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB:-busbooking}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      args:
+        APP_VERSION: ${IMAGE_TAG:-local}
+    image: bus-booking-api:${IMAGE_TAG:-local}
+    env_file: .env
+    environment:
+      APP_VERSION: ${IMAGE_TAG:-local}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready')",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  proxy:
+    build: ./ops/nginx
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+      - "8443:443"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
