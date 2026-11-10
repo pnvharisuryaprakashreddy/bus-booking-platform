@@ -69,7 +69,7 @@ jobs:
         run: |
           tag="${GITHUB_SHA}"
           docker build --build-arg APP_VERSION="${tag}" -t "bus-booking-api:${tag}" -t bus-booking-api:ci .
-          docker image inspect "bus-booking-api:${tag}" --format 'repository_tag=bus-booking-api:${tag} image_id={{.Id}}'
+          docker image inspect "bus-booking-api:${tag}" --format "repository_tag=bus-booking-api:${tag} image_id={{.Id}}"
       - name: Container scan
         run: |
           docker run --rm \
